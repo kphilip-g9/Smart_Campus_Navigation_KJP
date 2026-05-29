@@ -80,33 +80,126 @@ const TravellerIcon = new L.DivIcon({
     iconAnchor: [1, 1],
 });
 
-/* --- Location button --- */
-function MyLocationButton() {
-    const [position, setPosition] = useState(null);
-    const map = useMapEvents({
-        click() {
-            map.locate();
-        },
-        locationfound(e) {
-            setPosition(e.latlng);
-            map.flyTo(e.latlng, 17);
-        },
-    });
+/* --- Live Location Tracker --- */
+function LiveLocationTracker() {
+    const map = useMap();
+    const [watching, setWatching] = useState(false);
+    const watchIdRef = useRef(null);
+    const dotRef = useRef(null);
+    const ringRef = useRef(null);
+    const firstFixRef = useRef(true);
 
-    return position ? (
-        <Marker
-            position={position}
-            icon={L.divIcon({
-                html: `<div style="
-          width:14px;height:14px;background:#00b4d8;
-          border:2px solid white;border-radius:50%;
-          box-shadow:0 0 10px rgba(0,180,216,0.7);
-        "></div>`,
-                className: "",
-                iconSize: [14, 14],
-            })}
-        />
-    ) : null;
+    const toggleTracking = () => {
+        if (watching) {
+            // --- STOP ---
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+            if (dotRef.current) { map.removeLayer(dotRef.current); dotRef.current = null; }
+            if (ringRef.current) { map.removeLayer(ringRef.current); ringRef.current = null; }
+            firstFixRef.current = true;
+            setWatching(false);
+            return;
+        }
+
+        // --- START ---
+        if (!navigator.geolocation) {
+            alert("Geolocation is not supported by your browser.");
+            return;
+        }
+
+        setWatching(true);
+
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => {
+                const { latitude, longitude, accuracy } = pos.coords;
+                const latlng = [latitude, longitude];
+
+                // Remove old layers before redrawing
+                if (dotRef.current) { map.removeLayer(dotRef.current); dotRef.current = null; }
+                if (ringRef.current) { map.removeLayer(ringRef.current); ringRef.current = null; }
+
+                // Blue dot = you
+                dotRef.current = L.circleMarker(latlng, {
+                    radius: 8,
+                    fillColor: "#2563eb",
+                    color: "white",
+                    weight: 2.5,
+                    fillOpacity: 1,
+                    zIndexOffset: 1000,
+                }).addTo(map);
+
+                // Faint ring = accuracy radius
+                ringRef.current = L.circle(latlng, {
+                    radius: accuracy,
+                    color: "#2563eb",
+                    fillColor: "#2563eb",
+                    fillOpacity: 0.12,
+                    weight: 1,
+                }).addTo(map);
+
+                // Only fly to location on the first GPS fix
+                // After that, marker updates silently so you can browse the map
+                if (firstFixRef.current) {
+                    map.flyTo(latlng, 18, { animate: true, duration: 1.5 });
+                    firstFixRef.current = false;
+                }
+            },
+            (err) => {
+                const msgs = {
+                    1: "Location access denied. Please allow it in your browser settings.",
+                    2: "Location unavailable. Try stepping outdoors.",
+                    3: "Location request timed out. Try again.",
+                };
+                alert(msgs[err.code] || "Could not get your location.");
+                setWatching(false);
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        );
+    };
+
+    // Clean up when component unmounts
+    useEffect(() => {
+        return () => {
+            if (watchIdRef.current !== null) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+            }
+            if (dotRef.current) map.removeLayer(dotRef.current);
+            if (ringRef.current) map.removeLayer(ringRef.current);
+        };
+    }, [map]);
+
+    return (
+        <div style={{
+            position: "absolute",
+            bottom: "90px",
+            right: "10px",
+            zIndex: 1000,
+        }}>
+            <button
+                onClick={toggleTracking}
+                title={watching ? "Stop tracking my location" : "Show my location"}
+                style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "50%",
+                    background: watching ? "#2563eb" : "white",
+                    color: watching ? "white" : "#2563eb",
+                    border: `2px solid #2563eb`,
+                    cursor: "pointer",
+                    fontSize: "20px",
+                    boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                }}
+            >
+                📍
+            </button>
+        </div>
+    );
 }
 
 /* --- Route animation with Play / Pause and Directions --- */
