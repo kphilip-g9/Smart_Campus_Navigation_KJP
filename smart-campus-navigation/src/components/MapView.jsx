@@ -444,7 +444,7 @@ export default function MapView({
 
             <MapEventsHelper searchSelectedPlace={searchSelectedPlace} />
 
-            <MyLocationButton />
+            <LiveLocationTracker />
 
             {/* Base path lines */}
             {networkLines.map((l) => (
