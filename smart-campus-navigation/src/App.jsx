@@ -28,6 +28,8 @@ export default function App() {
   const [searchSelectedPlace, setSearchSelectedPlace] = useState(null);
   const [highlightedPlaceId, setHighlightedPlaceId] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [liveGps, setLiveGps] = useState(null);
 
   // Put your API key in an env variable in production. For now using inline
   const OPENWEATHER_API_KEY = "7b26a657d4aca4e9d60281088ae5d8de";
@@ -139,6 +141,25 @@ export default function App() {
 
   }, [selectedPlace, userLocation]);
 
+  function findNearestPlaceId(lat, lng) {
+    let nearest = null;
+    let minDist = Infinity;
+    PLACES.forEach((p) => {
+        const d = Math.hypot(p.lat - lat, p.lng - lng);
+        if (d < minDist) { minDist = d; nearest = p.id; }
+    });
+    return nearest;
+}
+
+function handleNavigateFromMyLocation() {
+    if (!liveGps) {
+        alert("Your location isn't available yet. Make sure you've allowed location access and the blue dot is visible on the map.");
+        return;
+    }
+    const nearestId = findNearestPlaceId(liveGps.lat, liveGps.lng);
+    setFromId(nearestId);
+    handleFind(nearestId, toId, viaPoints);
+}
   function handleFind(nextFromId, nextToId, nextViaPoints) {
     const f = nextFromId ?? fromId;
     const t = nextToId ?? toId;
@@ -271,6 +292,11 @@ export default function App() {
           searchSelectedPlace={searchSelectedPlace}
           setSearchSelectedPlace={setSearchSelectedPlace}
           highlightedPlaceId={highlightedPlaceId}
+          isNavigating={isNavigating}
+          setIsNavigating={setIsNavigating}
+          liveGps={liveGps}
+          setLiveGps={setLiveGps}
+          onNavigateFromLocation={handleNavigateFromMyLocation}
         />
       </main>
     </div>
