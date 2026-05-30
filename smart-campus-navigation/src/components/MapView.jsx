@@ -81,46 +81,77 @@ const TravellerIcon = new L.DivIcon({
 });
 
 /* --- Live Location Tracker --- */
-function LiveLocationTracker() {
+function LiveLocationTracker({
+    routeLatLngs,
+    routeSteps,
+    isNavigating,
+    setIsNavigating,
+    setLiveGps,
+    onNavigateFromLocation,
+    toId,
+}) {
     const map = useMap();
     const [watching, setWatching] = useState(false);
     const watchIdRef = useRef(null);
     const dotRef = useRef(null);
     const ringRef = useRef(null);
+    const remainingLineRef = useRef(null);
+    const completedLineRef = useRef(null);
     const firstFixRef = useRef(true);
+    const [currentInstruction, setCurrentInstruction] = useState("");
+    const [arrived, setArrived] = useState(false);
+
+    // Haversine distance in metres between two [lat,lng] points
+    function distMetres(a, b) {
+        const R = 6371000;
+        const dLat = (b[0] - a[0]) * Math.PI / 180;
+        const dLng = (b[1] - a[1]) * Math.PI / 180;
+        const sin2 = Math.sin(dLat / 2) ** 2 +
+            Math.cos(a[0] * Math.PI / 180) *
+            Math.cos(b[0] * Math.PI / 180) *
+            Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.asin(Math.sqrt(sin2));
+    }
 
     const toggleTracking = () => {
         if (watching) {
-            // --- STOP ---
             if (watchIdRef.current !== null) {
                 navigator.geolocation.clearWatch(watchIdRef.current);
                 watchIdRef.current = null;
             }
-            if (dotRef.current) { map.removeLayer(dotRef.current); dotRef.current = null; }
-            if (ringRef.current) { map.removeLayer(ringRef.current); ringRef.current = null; }
+            [dotRef, ringRef, remainingLineRef, completedLineRef].forEach(ref => {
+                if (ref.current) { map.removeLayer(ref.current); ref.current = null; }
+            });
             firstFixRef.current = true;
             setWatching(false);
+            setIsNavigating(false);
+            setCurrentInstruction("");
+            setArrived(false);
             return;
         }
 
-        // --- START ---
         if (!navigator.geolocation) {
             alert("Geolocation is not supported by your browser.");
             return;
         }
 
         setWatching(true);
+        firstFixRef.current = true;
 
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
-                const { latitude, longitude, accuracy } = pos.coords;
-                const latlng = [latitude, longitude];
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy;
+                const latlng = [lat, lng];
 
-                // Remove old layers before redrawing
-                if (dotRef.current) { map.removeLayer(dotRef.current); dotRef.current = null; }
-                if (ringRef.current) { map.removeLayer(ringRef.current); ringRef.current = null; }
+                // Push GPS to App so "Navigate from my location" can use it
+                setLiveGps({ lat, lng });
 
-                // Blue dot = you
+                // Redraw dot and accuracy ring
+                if (dotRef.current) map.removeLayer(dotRef.current);
+                if (ringRef.current) map.removeLayer(ringRef.current);
+
                 dotRef.current = L.circleMarker(latlng, {
                     radius: 8,
                     fillColor: "#2563eb",
@@ -130,7 +161,6 @@ function LiveLocationTracker() {
                     zIndexOffset: 1000,
                 }).addTo(map);
 
-                // Faint ring = accuracy radius
                 ringRef.current = L.circle(latlng, {
                     radius: accuracy,
                     color: "#2563eb",
@@ -139,12 +169,53 @@ function LiveLocationTracker() {
                     weight: 1,
                 }).addTo(map);
 
-                // Only fly to location on the first GPS fix
-                // After that, marker updates silently so you can browse the map
                 if (firstFixRef.current) {
                     map.flyTo(latlng, 18, { animate: true, duration: 1.5 });
                     firstFixRef.current = false;
                 }
+
+                // --- Navigation logic ---
+                if (!isNavigating || !routeLatLngs || routeLatLngs.length < 2) return;
+
+                // Find closest point on route to current GPS
+                let nearestIdx = 0;
+                let minDist = Infinity;
+                routeLatLngs.forEach((pt, i) => {
+                    const d = distMetres(latlng, pt);
+                    if (d < minDist) { minDist = d; nearestIdx = i; }
+                });
+
+                // Check arrival (within 20m of destination)
+                const destPt = routeLatLngs[routeLatLngs.length - 1];
+                if (distMetres(latlng, destPt) < 20) {
+                    setCurrentInstruction("🎉 You have arrived at your destination!");
+                    setArrived(true);
+                    setIsNavigating(false);
+                    return;
+                }
+
+                // Update instruction based on position
+                const stepIndex = Math.min(
+                    Math.floor((nearestIdx / routeLatLngs.length) * routeSteps.length),
+                    routeSteps.length - 1
+                );
+                setCurrentInstruction(routeSteps[stepIndex] || "Continue along the path");
+
+                // Draw completed path (grey) and remaining path (blue)
+                if (completedLineRef.current) map.removeLayer(completedLineRef.current);
+                if (remainingLineRef.current) map.removeLayer(remainingLineRef.current);
+
+                if (nearestIdx > 0) {
+                    completedLineRef.current = L.polyline(
+                        routeLatLngs.slice(0, nearestIdx + 1),
+                        { color: "#94a3b8", weight: 6, opacity: 0.6 }
+                    ).addTo(map);
+                }
+
+                remainingLineRef.current = L.polyline(
+                    routeLatLngs.slice(nearestIdx),
+                    { color: "#2563eb", weight: 6 }
+                ).addTo(map);
             },
             (err) => {
                 const msgs = {
@@ -159,46 +230,118 @@ function LiveLocationTracker() {
         );
     };
 
-    // Clean up when component unmounts
     useEffect(() => {
         return () => {
-            if (watchIdRef.current !== null) {
+            if (watchIdRef.current !== null)
                 navigator.geolocation.clearWatch(watchIdRef.current);
-            }
-            if (dotRef.current) map.removeLayer(dotRef.current);
-            if (ringRef.current) map.removeLayer(ringRef.current);
+            [dotRef, ringRef, remainingLineRef, completedLineRef].forEach(ref => {
+                if (ref.current) map.removeLayer(ref.current);
+            });
         };
     }, [map]);
 
     return (
-        <div style={{
-            position: "absolute",
-            bottom: "90px",
-            right: "10px",
-            zIndex: 1000,
-        }}>
-            <button
-                onClick={toggleTracking}
-                title={watching ? "Stop tracking my location" : "Show my location"}
-                style={{
-                    width: "42px",
-                    height: "42px",
-                    borderRadius: "50%",
-                    background: watching ? "#2563eb" : "white",
-                    color: watching ? "white" : "#2563eb",
-                    border: `2px solid #2563eb`,
-                    cursor: "pointer",
-                    fontSize: "20px",
-                    boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s ease",
-                }}
-            >
-                📍
-            </button>
-        </div>
+        <>
+            {/* Current instruction box — only shows during navigation */}
+            {isNavigating && currentInstruction && (
+                <div style={{
+                    position: "absolute",
+                    top: "16px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    background: arrived ? "#16a34a" : "rgba(37,99,235,0.95)",
+                    color: "white",
+                    padding: "12px 20px",
+                    borderRadius: "14px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.25)",
+                    zIndex: 1100,
+                    maxWidth: "320px",
+                    textAlign: "center",
+                    lineHeight: "1.4",
+                }}>
+                    {currentInstruction}
+                </div>
+            )}
+
+            {/* Bottom-right buttons */}
+            <div style={{
+                position: "absolute",
+                bottom: "90px",
+                right: "10px",
+                zIndex: 1000,
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+                alignItems: "flex-end",
+            }}>
+                {/* Navigate from my location button */}
+                {watching && (
+                    <button
+                        onClick={onNavigateFromLocation}
+                        title="Set my location as start point"
+                        style={{
+                            padding: "8px 14px",
+                            borderRadius: "20px",
+                            background: "#16a34a",
+                            color: "white",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        🧭 Navigate from here
+                    </button>
+                )}
+
+                {/* Start / Stop navigation */}
+                {watching && routeLatLngs && routeLatLngs.length > 1 && !arrived && (
+                    <button
+                        onClick={() => setIsNavigating(n => !n)}
+                        style={{
+                            padding: "8px 14px",
+                            borderRadius: "20px",
+                            background: isNavigating ? "#ef4444" : "#f59e0b",
+                            color: "white",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        {isNavigating ? "⏹ Stop Navigation" : "▶ Start Navigation"}
+                    </button>
+                )}
+
+                {/* Location dot toggle */}
+                <button
+                    onClick={toggleTracking}
+                    title={watching ? "Stop tracking" : "Show my location"}
+                    style={{
+                        width: "42px",
+                        height: "42px",
+                        borderRadius: "50%",
+                        background: watching ? "#2563eb" : "white",
+                        color: watching ? "white" : "#2563eb",
+                        border: "2px solid #2563eb",
+                        cursor: "pointer",
+                        fontSize: "20px",
+                        boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                >
+                    📍
+                </button>
+            </div>
+        </>
     );
 }
 
@@ -380,7 +523,12 @@ export default function MapView({
     setViaPoints,
     searchSelectedPlace,
     setSearchSelectedPlace,
-    highlightedPlaceId
+    highlightedPlaceId,
+    isNavigating,
+    setIsNavigating,
+    liveGps,
+    setLiveGps,
+    onNavigateFromLocation,
 }) {
     const networkLines = PATHS.map(([a, b], i) => {
         const A = PLACES.find((p) => p.id === a);
@@ -444,7 +592,16 @@ export default function MapView({
 
             <MapEventsHelper searchSelectedPlace={searchSelectedPlace} />
 
-            <LiveLocationTracker />
+            <LiveLocationTracker
+                routeLatLngs={routeLatLngs}
+                routeSteps={routeSteps}
+                isNavigating={isNavigating}
+                setIsNavigating={setIsNavigating}
+                setLiveGps={setLiveGps}
+                onNavigateFromLocation={onNavigateFromLocation}
+                toId={toId}
+            />
+
 
             {/* Base path lines */}
             {networkLines.map((l) => (
