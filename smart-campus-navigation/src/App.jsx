@@ -274,29 +274,28 @@ function handleNavigateFromMyLocation() {
 
       <main className="map-section">
         <MapView
-          namedPlaces={namedPlaces}
-          routeLatLngs={routeLatLngs}
-          routeIds={routeIds}
-          showFloatingSteps={showFloatingSteps}
-          showRouteAnimation={showRouteAnimation}
-          routeSteps={routeSteps}
-          setSelectedPlace={setSelectedPlace}
-          fromId={fromId}
-          setFromId={setFromId}
-          toId={toId}
-          setToId={setToId}
-          handleFind={handleFind}
-          darkMode={darkMode}
-          viaPoints={viaPoints}
-          setViaPoints={setViaPoints}
-          searchSelectedPlace={searchSelectedPlace}
-          setSearchSelectedPlace={setSearchSelectedPlace}
-          highlightedPlaceId={highlightedPlaceId}
-          isNavigating={isNavigating}
-          setIsNavigating={setIsNavigating}
-          liveGps={liveGps}
-          setLiveGps={setLiveGps}
-          onNavigateFromLocation={handleNavigateFromMyLocation}
+            namedPlaces={namedPlaces}
+            routeLatLngs={routeLatLngs}
+            routeIds={routeIds}
+            showFloatingSteps={showFloatingSteps}
+            showRouteAnimation={showRouteAnimation}
+            routeSteps={routeSteps}
+            setSelectedPlace={setSelectedPlace}
+            fromId={fromId}
+            setFromId={setFromId}
+            toId={toId}
+            setToId={setToId}
+            handleFind={handleFind}
+            darkMode={darkMode}
+            viaPoints={viaPoints}
+            setViaPoints={setViaPoints}
+            searchSelectedPlace={searchSelectedPlace}
+            setSearchSelectedPlace={setSearchSelectedPlace}
+            highlightedPlaceId={highlightedPlaceId}
+            isNavigating={isNavigating}
+            setIsNavigating={setIsNavigating}
+            setLiveGps={setLiveGps}
+            onNavigateFromLocation={handleNavigateFromMyLocation}
         />
       </main>
     </div>
