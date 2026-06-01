@@ -878,7 +878,7 @@ export default function MapView({
                 })}
 
             {/* Highlighted route */}
-            {routeLatLngs.length > 1 && !isNavigating && (
+            {routeLatLngs.length > 1 && (
                 <>
                     <Polyline positions={routeLatLngs} color="#2563eb" weight={6} />
                     <RouteDirectionArrows routeLatLngs={routeLatLngs} darkMode={darkMode} />
