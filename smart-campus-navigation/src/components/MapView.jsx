@@ -93,6 +93,7 @@ function LiveLocationTracker({
     const [watching, setWatching] = useState(false);
     const [currentInstruction, setCurrentInstruction] = useState("");
     const [arrived, setArrived] = useState(false);
+    const [autoCentre, setAutoCentre] = useState(true);
 
     const watchIdRef = useRef(null);
     const dotRef = useRef(null);
@@ -101,16 +102,36 @@ function LiveLocationTracker({
     const remainingLineRef = useRef(null);
     const firstFixRef = useRef(true);
     const latestGpsRef = useRef(null);
+    const pendingStartRef = useRef(false); // Feature 3: auto-start after first GPS fix
 
     // Stale closure fix
     const isNavigatingRef = useRef(isNavigating);
     const routeLatLngsRef = useRef(routeLatLngs);
     const routeStepsRef = useRef(routeSteps);
+    const autoCentreRef = useRef(true);
     useEffect(() => { isNavigatingRef.current = isNavigating; }, [isNavigating]);
     useEffect(() => { routeLatLngsRef.current = routeLatLngs; }, [routeLatLngs]);
     useEffect(() => { routeStepsRef.current = routeSteps; }, [routeSteps]);
 
-    // Reset arrived state when a new route is chosen
+    // Feature 1: reset auto-centre whenever navigation starts
+    useEffect(() => {
+        if (isNavigating) {
+            autoCentreRef.current = true;
+            setAutoCentre(true);
+        }
+    }, [isNavigating]);
+
+    // Feature 1: detect map drag → stop auto-centring
+    useMapEvents({
+        dragstart: () => {
+            if (isNavigatingRef.current) {
+                autoCentreRef.current = false;
+                setAutoCentre(false);
+            }
+        },
+    });
+
+    // Reset arrived when new route chosen
     useEffect(() => {
         if (routeLatLngs && routeLatLngs.length > 1) {
             setArrived(false);
@@ -148,12 +169,9 @@ function LiveLocationTracker({
         let bestSegIdx = 0;
         let bestDist = Infinity;
         let bestSnapped = route[0];
-
         for (let i = 0; i < route.length - 1; i++) {
-            const A = route[i];
-            const B = route[i + 1];
-            const ax = A[1], ay = A[0];
-            const bx = B[1], by = B[0];
+            const A = route[i], B = route[i + 1];
+            const ax = A[1], ay = A[0], bx = B[1], by = B[0];
             const px = latlng[1], py = latlng[0];
             const dx = bx - ax, dy = by - ay;
             const lenSq = dx * dx + dy * dy;
@@ -168,7 +186,6 @@ function LiveLocationTracker({
                 bestSnapped = snapped;
             }
         }
-
         return {
             snapped: bestDist < 40 ? bestSnapped : latlng,
             segIdx: bestSegIdx,
@@ -176,37 +193,18 @@ function LiveLocationTracker({
         };
     }
 
-    const toggleTracking = () => {
-        if (watching) {
-            if (watchIdRef.current !== null) {
-                navigator.geolocation.clearWatch(watchIdRef.current);
-                watchIdRef.current = null;
-            }
-            [dotRef, ringRef, completedLineRef, remainingLineRef].forEach(ref => {
-                if (ref.current) { map.removeLayer(ref.current); ref.current = null; }
-            });
-            firstFixRef.current = true;
-            latestGpsRef.current = null;
-            setWatching(false);
-            setIsNavigating(false);
-            setCurrentInstruction("");
-            setArrived(false);
-            return;
-        }
-
+    // Feature 3: extracted GPS start so Start Navigation can call it directly
+    function startGPS() {
+        if (watchIdRef.current !== null) return; // already running
         if (!navigator.geolocation) {
             alert("Geolocation is not supported by your browser.");
             return;
         }
-
-        setWatching(true);
         firstFixRef.current = true;
-
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
                 const { latitude, longitude, accuracy } = pos.coords;
                 const rawLatlng = [latitude, longitude];
-
                 latestGpsRef.current = rawLatlng;
                 setLiveGps({ lat: latitude, lng: longitude });
 
@@ -214,7 +212,6 @@ function LiveLocationTracker({
                 const currentSteps = routeStepsRef.current;
                 const navigating = isNavigatingRef.current;
 
-                // Snap dot to route line if navigating and on route
                 let displayLatlng = rawLatlng;
                 let segIdx = 0;
                 if (navigating && currentRoute && currentRoute.length > 1) {
@@ -223,7 +220,7 @@ function LiveLocationTracker({
                     segIdx = result.segIdx;
                 }
 
-                // Redraw blue dot at snapped position
+                // Redraw dot
                 if (dotRef.current) map.removeLayer(dotRef.current);
                 dotRef.current = L.circleMarker(displayLatlng, {
                     radius: 9,
@@ -234,7 +231,7 @@ function LiveLocationTracker({
                     zIndexOffset: 1000,
                 }).addTo(map);
 
-                // Accuracy ring stays at real GPS
+                // Accuracy ring
                 if (ringRef.current) map.removeLayer(ringRef.current);
                 ringRef.current = L.circle(rawLatlng, {
                     radius: accuracy,
@@ -244,15 +241,26 @@ function LiveLocationTracker({
                     weight: 1,
                 }).addTo(map);
 
-                // Only auto-pan on first GPS fix
+                // First fix: pan + handle pending navigation start
                 if (firstFixRef.current) {
                     map.flyTo(rawLatlng, 18, { animate: true, duration: 1.5 });
                     firstFixRef.current = false;
+                    // Feature 3: auto-start navigation after first fix
+                    if (pendingStartRef.current) {
+                        pendingStartRef.current = false;
+                        onNavigateFromLocation();
+                        setIsNavigating(true);
+                    }
+                }
+
+                // Feature 1: auto-centre during navigation
+                if (navigating && autoCentreRef.current) {
+                    map.panTo(displayLatlng, { animate: true, duration: 0.5 });
                 }
 
                 if (!navigating || !currentRoute || currentRoute.length < 2) return;
 
-                // Arrival check — use real GPS, not snapped
+                // Arrival check
                 const dest = currentRoute[currentRoute.length - 1];
                 if (distMetres(rawLatlng, dest) < 20) {
                     setCurrentInstruction("🎉 You have arrived at your destination!");
@@ -261,7 +269,7 @@ function LiveLocationTracker({
                     return;
                 }
 
-                // BUG 1 FIX — correct denominator so last step fires
+                // Step instruction
                 const stepIndex = Math.min(
                     Math.floor(
                         (segIdx / Math.max(currentRoute.length - 1, 1)) * currentSteps.length
@@ -270,14 +278,14 @@ function LiveLocationTracker({
                 );
                 setCurrentInstruction(currentSteps[stepIndex] || "Continue along the path");
 
-                // Grey = completed path up to current snapped position
+                // Grey completed path
                 if (completedLineRef.current) map.removeLayer(completedLineRef.current);
                 completedLineRef.current = L.polyline(
                     [...currentRoute.slice(0, segIdx + 1), displayLatlng],
                     { color: "#94a3b8", weight: 6, opacity: 0.8 }
                 ).addTo(map);
 
-                // Blue = remaining path from snapped position to destination
+                // Blue remaining path
                 if (remainingLineRef.current) map.removeLayer(remainingLineRef.current);
                 remainingLineRef.current = L.polyline(
                     [displayLatlng, ...currentRoute.slice(segIdx + 1)],
@@ -292,9 +300,36 @@ function LiveLocationTracker({
                 };
                 alert(msgs[err.code] || "Could not get your location.");
                 setWatching(false);
+                pendingStartRef.current = false;
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
         );
+    }
+
+    function stopGPS() {
+        if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        [dotRef, ringRef, completedLineRef, remainingLineRef].forEach(ref => {
+            if (ref.current) { map.removeLayer(ref.current); ref.current = null; }
+        });
+        firstFixRef.current = true;
+        latestGpsRef.current = null;
+        pendingStartRef.current = false;
+    }
+
+    const toggleTracking = () => {
+        if (watching) {
+            stopGPS();
+            setWatching(false);
+            setIsNavigating(false);
+            setCurrentInstruction("");
+            setArrived(false);
+        } else {
+            setWatching(true);
+            startGPS();
+        }
     };
 
     useEffect(() => {
@@ -309,7 +344,7 @@ function LiveLocationTracker({
 
     return (
         <>
-            {/* Instruction box — top centre, visible during navigation and on arrival */}
+            {/* Instruction box */}
             {(isNavigating || arrived) && currentInstruction && (
                 <div style={{
                     position: "absolute",
@@ -333,7 +368,7 @@ function LiveLocationTracker({
                 </div>
             )}
 
-            {/* BUG 2 FIX — hint card moved to 310px so it clears all buttons */}
+            {/* Hint card */}
             {watching && !isNavigating && !arrived && (
                 <div style={{
                     position: "absolute",
@@ -356,21 +391,18 @@ function LiveLocationTracker({
                     {routeLatLngs && routeLatLngs.length > 1 ? (
                         <>
                             <div>✅ Route is ready</div>
-                            <div>👇 Tap <b>Navigate from here</b></div>
-                            <div>▶️ Then <b>Start Navigation</b></div>
+                            <div>▶️ Tap <b>Start Navigation</b></div>
                         </>
                     ) : (
                         <>
                             <div>1️⃣ Tap any building</div>
                             <div>2️⃣ Tap <b>Reach here</b></div>
-                            <div>3️⃣ Tap <b>Navigate from here</b></div>
-                            <div>4️⃣ Tap <b>Start Navigation</b></div>
+                            <div>3️⃣ Tap <b>Start Navigation</b></div>
                         </>
                     )}
                 </div>
             )}
 
-            {/* Button cluster — bottom right */}
             <div style={{
                 position: "absolute",
                 bottom: "90px",
@@ -381,16 +413,38 @@ function LiveLocationTracker({
                 gap: "8px",
                 alignItems: "flex-end",
             }}>
-                {/* Recentre button */}
-                {watching && (
+                {/* Feature 1: Resume auto-centring button */}
+                {watching && isNavigating && !autoCentre && (
                     <button
                         onClick={() => {
-                            if (latestGpsRef.current) {
-                                map.flyTo(latestGpsRef.current, 18, {
-                                    animate: true,
-                                    duration: 1.0,
-                                });
-                            }
+                            autoCentreRef.current = true;
+                            setAutoCentre(true);
+                            if (latestGpsRef.current)
+                                map.flyTo(latestGpsRef.current, 18, { animate: true, duration: 1.0 });
+                        }}
+                        style={{
+                            padding: "8px 14px",
+                            borderRadius: "20px",
+                            background: "#7c3aed",
+                            color: "white",
+                            border: "none",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            fontWeight: "600",
+                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
+                            whiteSpace: "nowrap",
+                        }}
+                    >
+                        🎯 Resume following
+                    </button>
+                )}
+
+                {/* Recentre — only when not auto-centring */}
+                {watching && !isNavigating && (
+                    <button
+                        onClick={() => {
+                            if (latestGpsRef.current)
+                                map.flyTo(latestGpsRef.current, 18, { animate: true, duration: 1.0 });
                         }}
                         title="Recentre map on my location"
                         style={{
@@ -412,43 +466,35 @@ function LiveLocationTracker({
                     </button>
                 )}
 
-                {/* Navigate from my location */}
-                {watching && (
-                    <button
-                        onClick={onNavigateFromLocation}
-                        style={{
-                            padding: "8px 14px",
-                            borderRadius: "20px",
-                            background: "#16a34a",
-                            color: "white",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            fontWeight: "600",
-                            boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
-                            whiteSpace: "nowrap",
-                        }}
-                    >
-                        🧭 Navigate from here
-                    </button>
-                )}
-
-                {/* Start / Stop Navigation */}
-                {watching && routeLatLngs && routeLatLngs.length > 1 && (
+                {/* Feature 3: Smart Start Navigation — works even without GPS on */}
+                {routeLatLngs && routeLatLngs.length > 1 && (
                     <button
                         onClick={() => {
-                            setArrived(false);
-                            setIsNavigating(n => !n);
+                            if (isNavigating) {
+                                // Stop navigation
+                                setArrived(false);
+                                setIsNavigating(false);
+                            } else if (!watching) {
+                                // GPS not on yet — start it, auto-navigate after first fix
+                                pendingStartRef.current = true;
+                                setWatching(true);
+                                startGPS();
+                            } else {
+                                // GPS already on — start navigation immediately
+                                setArrived(false);
+                                onNavigateFromLocation();
+                                setIsNavigating(true);
+                            }
                         }}
                         style={{
-                            padding: "8px 14px",
+                            padding: "10px 18px",
                             borderRadius: "20px",
-                            background: isNavigating ? "#ef4444" : "#f59e0b",
+                            background: isNavigating ? "#ef4444" : "#2563eb",
                             color: "white",
                             border: "none",
                             cursor: "pointer",
-                            fontSize: "13px",
-                            fontWeight: "600",
+                            fontSize: "14px",
+                            fontWeight: "700",
                             boxShadow: "0 2px 10px rgba(0,0,0,0.25)",
                             whiteSpace: "nowrap",
                         }}
@@ -457,10 +503,10 @@ function LiveLocationTracker({
                     </button>
                 )}
 
-                {/* Location dot toggle */}
+                {/* 📍 toggle — now secondary, just for showing dot without navigating */}
                 <button
                     onClick={toggleTracking}
-                    title={watching ? "Stop tracking my location" : "Show my location"}
+                    title={watching ? "Stop location tracking" : "Show my location"}
                     style={{
                         width: "42px",
                         height: "42px",

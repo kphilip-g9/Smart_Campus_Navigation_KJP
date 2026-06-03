@@ -30,6 +30,7 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [liveGps, setLiveGps] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Put your API key in an env variable in production. For now using inline
   const OPENWEATHER_API_KEY = "7b26a657d4aca4e9d60281088ae5d8de";
@@ -80,6 +81,10 @@ export default function App() {
     }
   }
 
+  useEffect(() => {
+    setSidebarOpen(!isNavigating);
+  }, [isNavigating]);
+
   // Get user's current location and weather on first load
   useEffect(() => {
     if (!navigator.geolocation) {
@@ -111,6 +116,7 @@ export default function App() {
       }
     );
   }, []);
+
 
 
   //  Update weather whenever a building is selected or user location changes
@@ -235,69 +241,98 @@ function handleNavigateFromMyLocation() {
 
   return (
     <div className={`layout ${darkMode ? "dark" : ""}`}>
-      {/* Instructions overlay */}
-      <InstructionsPanel
-        open={showInstructions}
-        onClose={() => setShowInstructions(false)}
-        darkMode={darkMode}
-      />
-
-      {/* Sidebar */}
-      <Sidebar
-        fromId={fromId}
-        toId={toId}
-        namedPlaces={namedPlaces}
-        routeMeters={routeMeters}
-        routeSteps={routeSteps}
-        showFloatingSteps={showFloatingSteps}
-        setShowFloatingSteps={setShowFloatingSteps}
-        setShowRouteAnimation={setShowRouteAnimation}
-        setFromId={setFromId}
-        setToId={setToId}
-        handleClear={handleClear}
-        handleFind={handleFind}
-        selectedPlace={selectedPlace}
-        setSelectedPlace={setSelectedPlace}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        temperature={temperature}
-        loadingTemp={loadingTemp}
-        viaPoints={viaPoints}
-        setViaPoints={setViaPoints}
-        showInstructions={showInstructions}
-        setShowInstructions={setShowInstructions}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        setHighlightedPlaceId={setHighlightedPlaceId}
-        highlightedPlaceId={highlightedPlaceId}
-      />
-
-      <main className="map-section">
-        <MapView
-            namedPlaces={namedPlaces}
-            routeLatLngs={routeLatLngs}
-            routeIds={routeIds}
-            showFloatingSteps={showFloatingSteps}
-            showRouteAnimation={showRouteAnimation}
-            routeSteps={routeSteps}
-            setSelectedPlace={setSelectedPlace}
-            fromId={fromId}
-            setFromId={setFromId}
-            toId={toId}
-            setToId={setToId}
-            handleFind={handleFind}
+        <InstructionsPanel
+            open={showInstructions}
+            onClose={() => setShowInstructions(false)}
             darkMode={darkMode}
-            viaPoints={viaPoints}
-            setViaPoints={setViaPoints}
-            searchSelectedPlace={searchSelectedPlace}
-            setSearchSelectedPlace={setSearchSelectedPlace}
-            highlightedPlaceId={highlightedPlaceId}
-            isNavigating={isNavigating}
-            setIsNavigating={setIsNavigating}
-            setLiveGps={setLiveGps}
-            onNavigateFromLocation={handleNavigateFromMyLocation}
         />
-      </main>
+
+        {/* Collapsible sidebar wrapper */}
+        <div style={{
+            width: sidebarOpen ? "320px" : "0px",
+            minWidth: sidebarOpen ? "320px" : "0px",
+            overflow: "hidden",
+            transition: "width 0.3s ease, min-width 0.3s ease",
+            flexShrink: 0,
+        }}>
+            <Sidebar
+                fromId={fromId}
+                toId={toId}
+                namedPlaces={namedPlaces}
+                routeMeters={routeMeters}
+                routeSteps={routeSteps}
+                showFloatingSteps={showFloatingSteps}
+                setShowFloatingSteps={setShowFloatingSteps}
+                setShowRouteAnimation={setShowRouteAnimation}
+                setFromId={setFromId}
+                setToId={setToId}
+                handleClear={handleClear}
+                handleFind={handleFind}
+                selectedPlace={selectedPlace}
+                setSelectedPlace={setSelectedPlace}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                temperature={temperature}
+                loadingTemp={loadingTemp}
+                viaPoints={viaPoints}
+                setViaPoints={setViaPoints}
+                showInstructions={showInstructions}
+                setShowInstructions={setShowInstructions}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                setHighlightedPlaceId={setHighlightedPlaceId}
+                highlightedPlaceId={highlightedPlaceId}
+            />
+        </div>
+
+        <main className="map-section" style={{ position: "relative", flex: 1 }}>
+            {/* Sidebar toggle button — always visible on map edge */}
+            <button
+                onClick={() => setSidebarOpen(o => !o)}
+                title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                style={{
+                    position: "absolute",
+                    top: "10px",
+                    left: "10px",
+                    zIndex: 1000,
+                    background: "white",
+                    border: "2px solid #2563eb",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    cursor: "pointer",
+                    fontSize: "16px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    lineHeight: 1,
+                }}
+            >
+                {sidebarOpen ? "◀" : "☰"}
+            </button>
+
+            <MapView
+                namedPlaces={namedPlaces}
+                routeLatLngs={routeLatLngs}
+                routeIds={routeIds}
+                showFloatingSteps={showFloatingSteps}
+                showRouteAnimation={showRouteAnimation}
+                routeSteps={routeSteps}
+                setSelectedPlace={setSelectedPlace}
+                fromId={fromId}
+                setFromId={setFromId}
+                toId={toId}
+                setToId={setToId}
+                handleFind={handleFind}
+                darkMode={darkMode}
+                viaPoints={viaPoints}
+                setViaPoints={setViaPoints}
+                searchSelectedPlace={searchSelectedPlace}
+                setSearchSelectedPlace={setSearchSelectedPlace}
+                highlightedPlaceId={highlightedPlaceId}
+                isNavigating={isNavigating}
+                setIsNavigating={setIsNavigating}
+                setLiveGps={setLiveGps}
+                onNavigateFromLocation={handleNavigateFromMyLocation}
+            />
+        </main>
     </div>
-  );
+);
 }
