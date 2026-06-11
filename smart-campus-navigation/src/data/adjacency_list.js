@@ -1374,5 +1374,46 @@ export const GRAPH = {
       "to": "se_apj",
       "weight": 37.12
     }
+  ],
+
+  "b3": [
+    {
+      "to": "Saraswati",
+      "weight": 342.07
+    },
+    {
+      "to": "b4",
+      "weight": 99.4
+    }
+  ],
+
+  "b4": [
+    {
+      "to": "Saraswati",
+      "weight": 243.4
+    },
+    {
+      "to": "b3",
+      "weight": 99.4
+    }
+  ],
+
+  "Saraswati": [
+    {
+      "to": "to_Saraswati",
+      "weight": 42.61
+    },
+    {
+      "to": "to_Saraswati3",
+      "weight": 58.53
+    },
+    {
+      "to": "b3",
+      "weight": 342.07
+    },
+    {
+      "to": "b4",
+      "weight": 243.4
+    }
   ]
 };

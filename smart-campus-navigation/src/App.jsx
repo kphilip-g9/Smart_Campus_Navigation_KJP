@@ -162,6 +162,14 @@ export default function App() {
     if (fromId && toId) handleFind();
   }, [fromId, toId]);
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+      const handler = () => setIsMobile(window.innerWidth < 768);
+      window.addEventListener("resize", handler);
+      return () => window.removeEventListener("resize", handler);
+  }, []);
+
   // ── Route helpers ──────────────────────────────────────────────────────────
   function handleFind(nextFromId, nextToId, nextViaPoints) {
     const f = nextFromId ?? fromId;
@@ -228,194 +236,220 @@ export default function App() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <div
-      className={`layout ${darkMode ? "dark" : ""}`}
-      style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden" }}
+        className={`layout ${darkMode ? "dark" : ""}`}
+        style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden", position: "relative" }}
     >
-      <InstructionsPanel
-        open={showInstructions}
-        onClose={() => setShowInstructions(false)}
-        darkMode={darkMode}
-      />
-
-      {/* Collapsible sidebar */}
-      <div style={{
-        width: sidebarOpen ? "320px" : "0px",
-        minWidth: sidebarOpen ? "320px" : "0px",
-        overflow: "hidden",
-        transition: "width 0.3s ease, min-width 0.3s ease",
-        flexShrink: 0,
-      }}>
-        <Sidebar
-          fromId={fromId}
-          toId={toId}
-          namedPlaces={namedPlaces}
-          routeMeters={routeMeters}
-          routeSteps={routeSteps}
-          showFloatingSteps={showFloatingSteps}
-          setShowFloatingSteps={setShowFloatingSteps}
-          setShowRouteAnimation={setShowRouteAnimation}
-          setFromId={setFromId}
-          setToId={setToId}
-          handleClear={handleClear}
-          handleFind={handleFind}
-          selectedPlace={selectedPlace}
-          setSelectedPlace={setSelectedPlace}
-          darkMode={darkMode}
-          setDarkMode={setDarkMode}
-          temperature={temperature}
-          loadingTemp={loadingTemp}
-          viaPoints={viaPoints}
-          setViaPoints={setViaPoints}
-          showInstructions={showInstructions}
-          setShowInstructions={setShowInstructions}
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          setHighlightedPlaceId={setHighlightedPlaceId}
-          highlightedPlaceId={highlightedPlaceId}
-        />
-      </div>
-
-      {/* Map section */}
-      <main className="map-section" style={{ position: "relative", flex: 1, minWidth: 0 }}>
-
-        {/* Sidebar toggle button */}
-        <button
-          onClick={() => setSidebarOpen((o) => !o)}
-          title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
-          style={{
-            position: "absolute",
-            top: "10px",
-            left: "10px",
-            zIndex: 1500,
-            background: "white",
-            border: "2px solid #2563eb",
-            borderRadius: "8px",
-            padding: "6px 10px",
-            cursor: "pointer",
-            fontSize: "16px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-            lineHeight: 1,
-          }}
-        >
-          {sidebarOpen ? "◀" : "☰"}
-        </button>
-
-        <MapView
-          namedPlaces={namedPlaces}
-          routeLatLngs={routeLatLngs}
-          routeIds={routeIds}
-          showFloatingSteps={showFloatingSteps}
-          showRouteAnimation={showRouteAnimation}
-          routeSteps={routeSteps}
-          setSelectedPlace={setSelectedPlace}
-          fromId={fromId}
-          setFromId={setFromId}
-          toId={toId}
-          setToId={setToId}
-          handleFind={handleFind}
-          darkMode={darkMode}
-          viaPoints={viaPoints}
-          setViaPoints={setViaPoints}
-          searchSelectedPlace={searchSelectedPlace}
-          setSearchSelectedPlace={setSearchSelectedPlace}
-          highlightedPlaceId={highlightedPlaceId}
-          isNavigating={isNavigating}
-          setIsNavigating={setIsNavigating}
-          setLiveGps={setLiveGps}
-          onNavigateFromLocation={handleNavigateFromMyLocation}
-          sidebarOpen={sidebarOpen}
-          setCurrentInstruction={setCurrentInstruction}
-          setArrived={setArrived}
+        <InstructionsPanel
+            open={showInstructions}
+            onClose={() => setShowInstructions(false)}
+            darkMode={darkMode}
         />
 
-        {/* Bottom bar — Google Maps style */}
-        {routeLatLngs.length > 1 && (
-          <div style={{
-            position: "absolute",
-            bottom: 0, left: 0, right: 0,
-            background: arrived
-              ? "#16a34a"
-              : isNavigating
-                ? "rgba(30,41,59,0.97)"
-                : "white",
-            color: isNavigating || arrived ? "white" : "#1e293b",
-            padding: "14px 20px 20px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
-            zIndex: 1000,
-            borderRadius: "16px 16px 0 0",
-            transition: "background 0.3s ease",
-          }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {arrived ? (
-                <div style={{ fontSize: "16px", fontWeight: 700 }}>
-                  🎉 You have arrived!
-                </div>
-              ) : isNavigating ? (
-                <div style={{ fontSize: "15px", fontWeight: 600, lineHeight: 1.4 }}>
-                  {currentInstruction || "Follow the route..."}
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: "16px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {destinationPlace?.name ?? "Destination"}
-                  </div>
-                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
-                    {routeMeters > 0 ? `${routeMeters} m away` : "Route ready"}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {!arrived && (
-              <button
-                onClick={() => setIsNavigating((n) => !n)}
+        {/* Mobile backdrop — tap to close sidebar */}
+        {isMobile && sidebarOpen && (
+            <div
+                onClick={() => setSidebarOpen(false)}
                 style={{
-                  padding: "10px 22px",
-                  borderRadius: "12px",
-                  background: isNavigating ? "#ef4444" : "#2563eb",
-                  color: "white",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  whiteSpace: "nowrap",
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                  flexShrink: 0,
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(0,0,0,0.4)",
+                    zIndex: 1800,
                 }}
-              >
-                {isNavigating ? "⏹ Stop" : "▶ Start Navigation"}
-              </button>
-            )}
-
-            {arrived && (
-              <button
-                onClick={() => {
-                  setArrived(false);
-                  setCurrentInstruction("");
-                  handleClear();
-                }}
-                style={{
-                  padding: "10px 22px",
-                  borderRadius: "12px",
-                  background: "white",
-                  color: "#16a34a",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-              >
-                Done
-              </button>
-            )}
-          </div>
+            />
         )}
-      </main>
+
+        {/* Sidebar — overlay on mobile, flex child on desktop */}
+        <div style={isMobile ? {
+            position: "absolute",
+            top: 0,
+            left: 0,
+            height: "100%",
+            width: "300px",
+            zIndex: 1900,
+            transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.3s ease",
+            overflowY: "auto",
+            boxShadow: sidebarOpen ? "4px 0 20px rgba(0,0,0,0.3)" : "none",
+        } : {
+            width: sidebarOpen ? "320px" : "0px",
+            minWidth: sidebarOpen ? "320px" : "0px",
+            overflow: "hidden",
+            transition: "width 0.3s ease, min-width 0.3s ease",
+            flexShrink: 0,
+        }}>
+            <Sidebar
+                fromId={fromId}
+                toId={toId}
+                namedPlaces={namedPlaces}
+                routeMeters={routeMeters}
+                routeSteps={routeSteps}
+                showFloatingSteps={showFloatingSteps}
+                setShowFloatingSteps={setShowFloatingSteps}
+                setShowRouteAnimation={setShowRouteAnimation}
+                setFromId={setFromId}
+                setToId={setToId}
+                handleClear={handleClear}
+                handleFind={handleFind}
+                selectedPlace={selectedPlace}
+                setSelectedPlace={setSelectedPlace}
+                darkMode={darkMode}
+                setDarkMode={setDarkMode}
+                temperature={temperature}
+                loadingTemp={loadingTemp}
+                viaPoints={viaPoints}
+                setViaPoints={setViaPoints}
+                showInstructions={showInstructions}
+                setShowInstructions={setShowInstructions}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                setHighlightedPlaceId={setHighlightedPlaceId}
+                highlightedPlaceId={highlightedPlaceId}
+            />
+        </div>
+
+        {/* Map — always full width on mobile */}
+        <main
+            className="map-section"
+            style={{ position: "relative", flex: 1, minWidth: 0, width: "100%" }}
+        >
+            {/* Sidebar toggle */}
+            <button
+                onClick={() => setSidebarOpen(o => !o)}
+                title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+                style={{
+                    position: "absolute",
+                    top: "10px",
+                    left: "10px",
+                    zIndex: 1500,
+                    background: sidebarOpen && !isMobile ? "white" : "white",
+                    border: "2px solid #2563eb",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                    lineHeight: 1,
+                }}
+            >
+                {sidebarOpen ? "✕" : "☰"}
+            </button>
+
+            <MapView
+                namedPlaces={namedPlaces}
+                routeLatLngs={routeLatLngs}
+                routeIds={routeIds}
+                showFloatingSteps={showFloatingSteps}
+                showRouteAnimation={showRouteAnimation}
+                routeSteps={routeSteps}
+                setSelectedPlace={setSelectedPlace}
+                fromId={fromId}
+                setFromId={setFromId}
+                toId={toId}
+                setToId={setToId}
+                handleFind={handleFind}
+                darkMode={darkMode}
+                viaPoints={viaPoints}
+                setViaPoints={setViaPoints}
+                searchSelectedPlace={searchSelectedPlace}
+                setSearchSelectedPlace={setSearchSelectedPlace}
+                highlightedPlaceId={highlightedPlaceId}
+                isNavigating={isNavigating}
+                setIsNavigating={setIsNavigating}
+                setLiveGps={setLiveGps}
+                onNavigateFromLocation={handleNavigateFromMyLocation}
+                sidebarOpen={sidebarOpen}
+                setCurrentInstruction={setCurrentInstruction}
+                setArrived={setArrived}
+            />
+
+            {/* Bottom bar */}
+            {routeLatLngs.length > 1 && (
+                <div style={{
+                    position: "absolute",
+                    bottom: 0, left: 0, right: 0,
+                    background: arrived
+                        ? "#16a34a"
+                        : isNavigating
+                            ? "rgba(30,41,59,0.97)"
+                            : "white",
+                    color: isNavigating || arrived ? "white" : "#1e293b",
+                    padding: "14px 20px 24px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    borderRadius: "16px 16px 0 0",
+                    transition: "background 0.3s ease",
+                }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        {arrived ? (
+                            <div style={{ fontSize: "16px", fontWeight: 700 }}>
+                                🎉 You have arrived!
+                            </div>
+                        ) : isNavigating ? (
+                            <div style={{ fontSize: "15px", fontWeight: 600, lineHeight: 1.4 }}>
+                                {currentInstruction || "Follow the route..."}
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: "16px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {destinationPlace?.name ?? "Destination"}
+                                </div>
+                                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
+                                    {routeMeters > 0 ? `${routeMeters} m away` : "Route ready"}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {!arrived && (
+                        <button
+                            onClick={() => setIsNavigating(n => !n)}
+                            style={{
+                                padding: "10px 22px",
+                                borderRadius: "12px",
+                                background: isNavigating ? "#ef4444" : "#2563eb",
+                                color: "white",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                flexShrink: 0,
+                            }}
+                        >
+                            {isNavigating ? "⏹ Stop" : "▶ Start"}
+                        </button>
+                    )}
+
+                    {arrived && (
+                        <button
+                            onClick={() => {
+                                setArrived(false);
+                                setCurrentInstruction("");
+                                handleClear();
+                            }}
+                            style={{
+                                padding: "10px 22px",
+                                borderRadius: "12px",
+                                background: "white",
+                                color: "#16a34a",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                fontWeight: 700,
+                                flexShrink: 0,
+                            }}
+                        >
+                            Done
+                        </button>
+                    )}
+                </div>
+            )}
+        </main>
     </div>
-  );
+);
 }
