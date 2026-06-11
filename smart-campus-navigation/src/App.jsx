@@ -33,7 +33,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [currentInstruction, setCurrentInstruction] = useState("");
   const [arrived, setArrived] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+
 
   // Put your API key in an env variable in production. For now using inline
   const OPENWEATHER_API_KEY = "7b26a657d4aca4e9d60281088ae5d8de";
