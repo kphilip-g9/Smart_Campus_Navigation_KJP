@@ -154,4 +154,8 @@ export const PATHS = [
   ["sw_apj","Apj"],
   ["se_apj","Apj"],
 
+  ["Saraswati", "b3"],
+  ["Saraswati", "b4"],
+  ["b3", "b4"],
+
 ];

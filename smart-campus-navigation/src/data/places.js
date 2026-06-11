@@ -46,7 +46,7 @@ export const PLACES = [
   { id: "nila_mess", name: "Nila Mess", aliases: [], lat: 10.806056, lng: 76.726175, info: "nila mess near tilang hostel" },
 
   { id: "brundavan", name: "Brindavani", aliases: ["Brindavani hostel","Nila boys hostel-2"], lat: 10.806863, lng: 76.725432, info: "Brindavani Boys Hostel" },
-
+  
 
 
 
@@ -142,6 +142,10 @@ export const PLACES = [
   { id: "Kedaram_parking", name: "Kedaram parking Area", aliases: [], lat: 10.809568, lng: 76.740115, info: "Parking area near Kedaram building." },
 
   { id: "Cricket_ground", name: "Cricket Ground", aliases: ["Athletics track"], lat: 10.810232, lng: 76.740853, info: "Cricket playing ground and athletics track." },
+
+  { id: "b3", name: "B3", aliases:[ "Block B3" ],lat: 10.805693, lng: 76.738229},
+
+  { id: "b4", name: "B4", aliases: [ "Block B4" ],lat: 10.806232, lng: 76.738955},
 
 
 
