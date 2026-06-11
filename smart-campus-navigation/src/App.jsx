@@ -31,6 +31,9 @@ export default function App() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [liveGps, setLiveGps] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [currentInstruction, setCurrentInstruction] = useState("");
+  const [arrived, setArrived] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   // Put your API key in an env variable in production. For now using inline
   const OPENWEATHER_API_KEY = "7b26a657d4aca4e9d60281088ae5d8de";
@@ -81,9 +84,18 @@ export default function App() {
     }
   }
 
+  // Auto-collapse sidebar when navigation starts
   useEffect(() => {
-    setSidebarOpen(!isNavigating);
+      setSidebarOpen(!isNavigating);
   }, [isNavigating]);
+
+  // Reset arrived when a new route is drawn
+  useEffect(() => {
+      if (routeLatLngs.length > 1) {
+          setArrived(false);
+          setCurrentInstruction("");
+      }
+  }, [routeLatLngs]);
 
   // Get user's current location and weather on first load
   useEffect(() => {
@@ -239,15 +251,17 @@ function handleNavigateFromMyLocation() {
     [routeIds]
   );
 
+  const destinationPlace = PLACES.find(p => p.id === toId);
+
   return (
-    <div className={`layout ${darkMode ? "dark" : ""}`}>
+    <div className={`layout ${darkMode ? "dark" : ""}`} style={{ display: "flex", width: "100vw", height: "100vh", overflow: "hidden" }}>
         <InstructionsPanel
             open={showInstructions}
             onClose={() => setShowInstructions(false)}
             darkMode={darkMode}
         />
 
-        {/* Collapsible sidebar wrapper */}
+        {/* Collapsible sidebar */}
         <div style={{
             width: sidebarOpen ? "320px" : "0px",
             minWidth: sidebarOpen ? "320px" : "0px",
@@ -285,8 +299,10 @@ function handleNavigateFromMyLocation() {
             />
         </div>
 
-        <main className="map-section" style={{ position: "relative", flex: 1 }}>
-            {/* Sidebar toggle button — always visible on map edge */}
+        {/* Map section */}
+        <main className="map-section" style={{ position: "relative", flex: 1, minWidth: 0 }}>
+
+            {/* Sidebar toggle — sits above Leaflet zoom controls */}
             <button
                 onClick={() => setSidebarOpen(o => !o)}
                 title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
@@ -294,7 +310,7 @@ function handleNavigateFromMyLocation() {
                     position: "absolute",
                     top: "10px",
                     left: "10px",
-                    zIndex: 1000,
+                    zIndex: 1500,
                     background: "white",
                     border: "2px solid #2563eb",
                     borderRadius: "8px",
@@ -331,7 +347,100 @@ function handleNavigateFromMyLocation() {
                 setIsNavigating={setIsNavigating}
                 setLiveGps={setLiveGps}
                 onNavigateFromLocation={handleNavigateFromMyLocation}
+                sidebarOpen={sidebarOpen}
+                setCurrentInstruction={setCurrentInstruction}
+                setArrived={setArrived}
             />
+
+            {/* Bottom navigation bar — Google Maps style */}
+            {routeLatLngs.length > 1 && (
+                <div style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    background: arrived
+                        ? "#16a34a"
+                        : isNavigating
+                            ? "rgba(30,41,59,0.97)"
+                            : "white",
+                    color: isNavigating || arrived ? "white" : "#1e293b",
+                    padding: "14px 20px 20px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    boxShadow: "0 -4px 20px rgba(0,0,0,0.15)",
+                    zIndex: 1000,
+                    borderRadius: "16px 16px 0 0",
+                    transition: "background 0.3s ease",
+                }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        {arrived ? (
+                            <div style={{ fontSize: "16px", fontWeight: 700 }}>
+                                🎉 You have arrived!
+                            </div>
+                        ) : isNavigating ? (
+                            <div style={{ fontSize: "15px", fontWeight: 600, lineHeight: 1.4 }}>
+                                {currentInstruction || "Follow the route..."}
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{ fontSize: "16px", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {destinationPlace?.name ?? "Destination"}
+                                </div>
+                                <div style={{ fontSize: "13px", color: "#64748b", marginTop: "2px" }}>
+                                    {routeMeters > 0 ? `${routeMeters} m away` : "Route ready"}
+                                </div>
+                            </>
+                        )}
+                    </div>
+
+                    {!arrived && (
+                        <button
+                            onClick={() => setIsNavigating(n => !n)}
+                            style={{
+                                padding: "10px 22px",
+                                borderRadius: "12px",
+                                background: isNavigating ? "#ef4444" : "#2563eb",
+                                color: "white",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                                flexShrink: 0,
+                            }}
+                        >
+                            {isNavigating ? "⏹ Stop" : "▶ Start Navigation"}
+                        </button>
+                    )}
+
+                    {arrived && (
+                        <button
+                            onClick={() => {
+                                setArrived(false);
+                                setCurrentInstruction("");
+                                handleClear();
+                            }}
+                            style={{
+                                padding: "10px 22px",
+                                borderRadius: "12px",
+                                background: "white",
+                                color: "#16a34a",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: "14px",
+                                fontWeight: 700,
+                                flexShrink: 0,
+                            }}
+                        >
+                            Done
+                        </button>
+                    )}
+                </div>
+            )}
         </main>
     </div>
 );
