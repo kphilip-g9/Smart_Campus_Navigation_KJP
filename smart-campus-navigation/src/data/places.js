@@ -143,9 +143,9 @@ export const PLACES = [
 
   { id: "Cricket_ground", name: "Cricket Ground", aliases: ["Athletics track"], lat: 10.810232, lng: 76.740853, info: "Cricket playing ground and athletics track." },
 
-  { id: "b3", name: "B3", aliases:[ "Block B3" ],lat: 10.805693, lng: 76.738229},
+  { id: "b3", name: "B3", aliases:[ "Block B3" ],lat: 10.805693, lng: 76.738229,info: "" }, 
 
-  { id: "b4", name: "B4", aliases: [ "Block B4" ],lat: 10.806232, lng: 76.738955},
+  { id: "b4", name: "B4", aliases: [ "Block B4" ],lat: 10.806232, lng: 76.738955, info: ""},
 
 
 
