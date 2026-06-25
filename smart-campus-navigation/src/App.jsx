@@ -131,26 +131,27 @@ export default function App() {
 
   // Search filtering
   useEffect(() => {
-    if (!toSearch.trim()) { setToResults([]); return; }
-    const q = toSearch.toLowerCase();
-    setToResults(
-      namedPlaces.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        (p.aliases || []).some(a => a.toLowerCase().includes(q))
-      ).slice(0, 6)
-    );
-  }, [toSearch]);
+      if (useMyLocation) { setFromResults([]); return; }
+      const q = fromSearch.trim().toLowerCase();
+      if (!q) return; // don't show on empty — handled by onFocus
+      setFromResults(
+          namedPlaces.filter(p =>
+              p.name.toLowerCase().includes(q) ||
+              (p.aliases || []).some(a => a.toLowerCase().includes(q))
+          ).slice(0, 8)
+      );
+  }, [fromSearch, useMyLocation]);
 
   useEffect(() => {
-    if (!fromSearch.trim() || useMyLocation) { setFromResults([]); return; }
-    const q = fromSearch.toLowerCase();
-    setFromResults(
-      namedPlaces.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        (p.aliases || []).some(a => a.toLowerCase().includes(q))
-      ).slice(0, 6)
-    );
-  }, [fromSearch]);
+      const q = toSearch.trim().toLowerCase();
+      if (!q) return; // don't show on empty — handled by onFocus
+      setToResults(
+          namedPlaces.filter(p =>
+              p.name.toLowerCase().includes(q) ||
+              (p.aliases || []).some(a => a.toLowerCase().includes(q))
+          ).slice(0, 8)
+      );
+  }, [toSearch]);
 
   // ── Colours ────────────────────────────────────────────────────────────────
   const bg = darkMode ? "#0f172a" : "#ffffff";
@@ -244,13 +245,25 @@ export default function App() {
           {/* From search */}
           <div style={{ position: "relative" }}>
             <input
-              value={fromSearch}
-              onChange={e => { setFromSearch(e.target.value); setUseMyLocation(false); setFromIdRaw(""); }}
-              placeholder="Search starting building..."
-              style={{
-                ...inputStyle,
-                borderColor: (!useMyLocation && fromId) ? "#2563eb" : border,
-              }}
+                value={fromSearch}
+                onChange={e => {
+                    setFromSearch(e.target.value);
+                    setUseMyLocation(false);
+                    setFromIdRaw("");
+                }}
+                onFocus={() => {
+                    // Show all places immediately on tap
+                    setFromResults(namedPlaces.slice(0, 8));
+                }}
+                onBlur={() => {
+                    // Small delay so click on item registers before dropdown closes
+                    setTimeout(() => setFromResults([]), 150);
+                }}
+                placeholder="Search starting building..."
+                style={{
+                    ...inputStyle,
+                    borderColor: (!useMyLocation && fromId) ? "#2563eb" : border,
+                }}
             />
             {fromResults.length > 0 && (
               <div style={dropdownStyle}>
@@ -288,13 +301,23 @@ export default function App() {
 
           <div style={{ position: "relative" }}>
             <input
-              value={toSearch}
-              onChange={e => { setToSearch(e.target.value); setToIdRaw(""); }}
-              placeholder="Search destination building..."
-              style={{
-                ...inputStyle,
-                borderColor: toId ? "#2563eb" : border,
-              }}
+                value={toSearch}
+                onChange={e => {
+                    setToSearch(e.target.value);
+                    setToIdRaw("");
+                }}
+                onFocus={() => {
+                    // Show all places immediately on tap
+                    setToResults(namedPlaces.slice(0, 8));
+                }}
+                onBlur={() => {
+                    setTimeout(() => setToResults([]), 150);
+                }}
+                placeholder="Search destination building..."
+                style={{
+                    ...inputStyle,
+                    borderColor: toId ? "#2563eb" : border,
+                }}
             />
             {toResults.length > 0 && (
               <div style={dropdownStyle}>
