@@ -80,6 +80,35 @@ const TravellerIcon = new L.DivIcon({
     iconAnchor: [1, 1],
 });
 
+function calculateBearing(lat1, lng1, lat2, lng2) {
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δλ = (lng2 - lng1) * Math.PI / 180;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function makeArrowIcon(bearing) {
+    return L.divIcon({
+        html: `
+            <div style="
+                width:32px; height:32px;
+                display:flex; align-items:center; justify-content:center;
+                transform:rotate(${bearing}deg);
+            ">
+                <svg width="22" height="30" viewBox="0 0 22 30" xmlns="http://www.w3.org/2000/svg">
+                    <polygon points="11,2 21,28 11,21 1,28"
+                        fill="#2563eb" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+                    <circle cx="11" cy="19" r="3" fill="white"/>
+                </svg>
+            </div>`,
+        className: "",
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+    });
+}
+
 /* --- Live Location Tracker --- */
 function LiveLocationTracker({
     routeLatLngs,
@@ -107,6 +136,8 @@ function LiveLocationTracker({
     const routeLatLngsRef = useRef(routeLatLngs);
     const routeStepsRef = useRef(routeSteps);
     const autoCentreRef = useRef(true);
+    const prevGpsRef = useRef(null);
+    const bearingRef = useRef(0);
 
     useEffect(() => { isNavigatingRef.current = isNavigating; }, [isNavigating]);
     useEffect(() => { routeLatLngsRef.current = routeLatLngs; }, [routeLatLngs]);
@@ -200,18 +231,37 @@ function LiveLocationTracker({
                     segIdx = r.segIdx;
                 }
 
-                // Blue dot
+                // Calculate bearing from movement direction
+                if (prevGpsRef.current) {
+                    const [prevLat, prevLng] = prevGpsRef.current;
+                    const moved = distMetres([prevLat, prevLng], rawLatlng);
+                    if (moved > 2) {
+                        // Only update bearing if you moved more than 2m
+                        // (prevents jitter when standing still)
+                        bearingRef.current = calculateBearing(
+                            prevLat, prevLng,
+                            latitude, longitude
+                        );
+                    }
+                }
+                prevGpsRef.current = rawLatlng;
+
+                // Redraw arrow at your position
                 if (dotRef.current) map.removeLayer(dotRef.current);
-                dotRef.current = L.circleMarker(displayLatlng, {
-                    radius: 9, fillColor: "#2563eb", color: "white",
-                    weight: 2.5, fillOpacity: 1, zIndexOffset: 1000,
+                dotRef.current = L.marker(displayLatlng, {
+                    icon: makeArrowIcon(bearingRef.current),
+                    zIndexOffset: 1000,
+                    interactive: false,
                 }).addTo(map);
 
-                // Accuracy ring at real GPS
+                // Accuracy ring stays at real GPS (not snapped)
                 if (ringRef.current) map.removeLayer(ringRef.current);
                 ringRef.current = L.circle(rawLatlng, {
-                    radius: accuracy, color: "#2563eb",
-                    fillColor: "#2563eb", fillOpacity: 0.10, weight: 1,
+                    radius: accuracy,
+                    color: "#2563eb",
+                    fillColor: "#2563eb",
+                    fillOpacity: 0.10,
+                    weight: 1,
                 }).addTo(map);
 
                 // First fix: fly to location + set route from here
